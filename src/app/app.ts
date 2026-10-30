@@ -89,7 +89,7 @@ export class App {
   profile=signal<Profile|null>(null); customFoods=signal<Food[]>([]); diary=signal<Record<string,Item[]>>({}); waterByDate=signal<Record<string,number>>({}); workoutsByDate=signal<Record<string,Workout[]>>({}); plannerMeals=signal(3); foodKind:'single'|'recipe'='single'; recipeIngredients:RecipeIngredient[]=[{foodId:'',grams:100}]; recipeCookedWeight=100; waterInput=250; exerciseName=''; exerciseSets:WorkoutSet[]=[{reps:10,weightKg:0}];
   profileForm:ProfileDraft={name:'',age:null,sex:'',heightCm:null,weightKg:null,activity:'',goal:'',preferences:''};
   newFood:Partial<Food>={category:'Other',caloriesPer100g:0,name:''};
-  foods=computed(()=>[...this.customFoods().map(f=>({...f,portionGrams:f.portionGrams||100,portionLabel:f.portionLabel||'100 g'})),...BUILT_INS.filter(f=>!EXTRA_IDS.has(f.id)),...FOOD_EXTRAS].map(f=>({...f,caloriesPer100g:f.caloriesPer100g??f.kcal??0,nameEn:f.nameEn??f.name,nameAr:f.nameAr??BUILT_IN_ARABIC_NAMES[f.id]??'',sourceType:f.sourceType??(USER_SUPPLIED_IDS.has(f.id)?'user-supplied-estimate':'reference-estimate'),sourceUrl:f.sourceUrl===undefined&&(f.sourceType??(USER_SUPPLIED_IDS.has(f.id)?'user-supplied-estimate':'reference-estimate'))==='reference-estimate'?'https://fdc.nal.usda.gov/food-search/?query='+encodeURIComponent(f.nameEn??f.name):f.sourceUrl??null,isVerified:f.isVerified??false})));
+  foods=computed(()=>[...this.customFoods().map(f=>({...f,portionGrams:f.portionGrams||100,portionLabel:f.portionLabel||'100 g'})),...BUILT_INS.filter(f=>!EXTRA_IDS.has(f.id)),...FOOD_EXTRAS].map(f=>({...f,caloriesPer100g:f.caloriesPer100g??f.kcal??0,nameEn:f.nameEn??f.name,nameAr:f.nameAr??BUILT_IN_ARABIC_NAMES[f.id]??'',sourceType:f.sourceType??(USER_SUPPLIED_IDS.has(f.id)?'user-supplied-estimate':'reference-estimate'),sourceUrl:f.sourceUrl===undefined&&(f.sourceType??(USER_SUPPLIED_IDS.has(f.id)?'user-supplied-estimate':'reference-estimate'))==='reference-estimate'?'https://fdc.nal.usda.gov/food-search/?query='+encodeURIComponent(f.nameEn??f.name):f.sourceUrl??null,isVerified:f.isVerified??false})).map(f=>this.addEstimatedMacros(f)));
   foodCategories=computed(()=>['All',...Array.from(new Set(this.foods().map(food=>food.category))).sort()]);
   currentItems=computed(()=>this.diary()[this.selectedDate()]||[]);
   currentWater=computed(()=>this.waterByDate()[this.selectedDate()]||0);
@@ -107,6 +107,35 @@ export class App {
   normalizeFood(food:Food):Food{const{ kcal:legacyKcal,...current}=food;return{...current,caloriesPer100g:Number(food.caloriesPer100g??legacyKcal??0),nameEn:food.nameEn??food.name,sourceType:food.sourceType??'reference-estimate',sourceUrl:food.sourceUrl??null,isVerified:food.isVerified??false}}
   byId(id:string){return this.foods().find(f=>f.id===id)}
   calc(f:Food,g:number){return{kcal:f.caloriesPer100g*g/100,protein:f.protein===null?null:f.protein*g/100,carbs:f.carbs===null?null:f.carbs*g/100,fat:f.fat===null?null:f.fat*g/100}}
+  addEstimatedMacros(food:Food):Food{if(food.sourceType==='food-label'||food.sourceType==='homemade-recipe')return food;const id=food.id,name=(food.nameEn||food.name).toLowerCase(),kcal=food.caloriesPer100g,round=(n:number)=>Math.round(n*10)/10;let protein=0,carbs=0,fat=0;
+    const nutMacros:Record<string,[number,number,number]>={'ref-almonds':[21.2,21.6,49.9],'ref-walnuts':[15.2,13.7,65.2],'ref-cashews':[18.2,30.2,43.9],'ref-peanuts':[25.8,16.1,49.2],'ref-pistachios':[20.2,27.2,45.3],'ref-hazelnuts':[15,16.7,60.8],'ref-chia-seeds':[16.5,42.1,30.7],'ref-sesame-seeds':[17.7,23.4,49.7],'ref-tahini':[17,21,54],'ref-peanut-butter':[25,20,50]};const nuts=nutMacros[food.id];
+    if(nuts)[protein,carbs,fat]=nuts;
+    else if(/water|coffee|tea/.test(`${food.id} ${name}`)){}
+    else if(/olive oil|vegetable oil|oil$|ghee|butter|mayonnaise|heavy cream|clotted cream/.test(`${food.id} ${name}`)){protein=0;carbs=0;fat=kcal/9;if(/mayonnaise/.test(name)){protein=.9;carbs=.6;fat=(kcal-protein*4-carbs*4)/9}if(/cream/.test(name)){protein=2.1;carbs=2.8;fat=Math.max(0,(kcal-protein*4-carbs*4)/9)}}
+    else if(/egg-white/.test(food.id)){protein=10.9;carbs=.7;fat=.2}
+    else if(/egg-yolk/.test(food.id)){protein=15.9;carbs=3.6;fat=26.5}
+    else if(/egg/.test(food.id)){protein=12.6;carbs=.7;fat=9.5}
+    else if(food.category==='Meat'){
+      protein=/liver/.test(name)?19:/heart/.test(name)?15.6:/lamb/.test(name)?17.4:/ground beef.*80.?20/.test(name)?17.2:/ground beef.*90/.test(name)?20.0:/salmon/.test(name)?20.4:/tilapia/.test(name)?20.1:/shrimp/.test(name)?20.1:/sardine/.test(name)?24.6:/tuna/.test(name)?25.5:/basturma/.test(name)?30:/luncheon|salami/.test(name)?18:/turkey/.test(name)?20:22;carbs=/luncheon/.test(name)?3:0;fat=Math.max(0,(kcal-protein*4-carbs*4)/9)
+    }
+    else if(food.category==='Dairy'){
+      if(/milk|yogurt/.test(name)){protein=/greek/.test(name)?10.3:3.4;carbs=/greek/.test(name)?3.6:4.8;fat=Math.max(0,(kcal-protein*4-carbs*4)/9)}
+      else if(/cream/.test(name)){protein=2.1;carbs=2.8;fat=Math.max(0,(kcal-protein*4-carbs*4)/9)}
+      else {protein=/cottage/.test(name)?17:/cheddar/.test(name)?20:/mozzarella/.test(name)?22:/feta|roumy/.test(name)?15:18;carbs=/cottage/.test(name)?3.4:2;fat=Math.max(0,(kcal-protein*4-carbs*4)/9)}
+    }
+    else if(/chickpea|lentil|fava|bean|pea/.test(name)){const dry=/dry|uncooked|raw/.test(name);protein=dry?22:8.5;carbs=dry?61:20;fat=dry?2:1.5;if(/lentil/.test(name)){protein=dry?24.6:9;carbs=dry?63:20;fat=dry?1.1:.4}if(/fava/.test(name)){protein=dry?26:7.6;carbs=dry?58:19.7;fat=dry?1.5:.4}}
+    else if(/popcorn/.test(name)){protein=12.9;carbs=77.8;fat=4.5}
+    else if(/potato chips/.test(name)){protein=6.6;carbs=53;fat=35.2}
+    else if(/rice|pasta|bulgur|freekeh|couscous|oat|flour|bread|toast|tortilla|corn|potato|taro/.test(name)){protein=/oat/.test(name)?16.9:/rice/.test(name)?(/cooked/.test(name)?2.7:7.1):/pasta/.test(name)?(/cooked/.test(name)?5.5:13):/bread|toast|tortilla/.test(name)?9:/potato|taro/.test(name)?2:12;fat=/oat/.test(name)?6.9:/bread|toast|tortilla/.test(name)?3.5:/pasta/.test(name)?1.5:.8;carbs=Math.max(0,(kcal-protein*4-fat*9)/4)}
+    else if(/sugar|honey|molasses|jam|juice|raisin|dried apricot|date/.test(name)){protein=/date|raisin|apricot/.test(name)?2:0;fat=.2;carbs=Math.max(0,(kcal-protein*4-fat*9)/4)}
+    else if(/cocoa|chocolate/.test(name)){protein=7.8;carbs=45;fat=Math.max(0,(kcal-protein*4-carbs*4)/9)}
+    else if(/avocado/.test(name)){protein=2;carbs=8.5;fat=14.7}
+    else if(food.category==='Produce'||food.category==='Vegetables'||food.category==='Fruits'){protein=/spinach|parsley/.test(name)?2.9:/broccoli/.test(name)?2.8:1.2;fat=.3;carbs=Math.max(0,(kcal-protein*4-fat*9)/4)}
+    else if(food.category==='Drinks'){protein=0;fat=0;carbs=Math.max(0,kcal/4)}
+    else if(/vinegar|mustard|soy sauce|ketchup/.test(name)){protein=/soy sauce/.test(name)?8:2;fat=.5;carbs=Math.max(0,(kcal-protein*4-fat*9)/4)}
+    else {protein=2;fat=1;carbs=Math.max(0,(kcal-protein*4-fat*9)/4)}
+    return{...food,protein:food.protein??round(protein),carbs:food.carbs??round(carbs),fat:food.fat??round(fat)}
+  }
   sum(rows:{food:Food;grams:number}[]){const v=(k:'protein'|'carbs'|'fat')=>rows.some(x=>x.food[k]===null)?null:rows.reduce((s,x)=>s+(x.food[k]!*x.grams/100),0);return{kcal:rows.reduce((s,x)=>s+x.food.caloriesPer100g*x.grams/100,0),protein:v('protein'),carbs:v('carbs'),fat:v('fat')}}
   profileError(field:'name'|'age'|'sex'|'heightCm'|'weightKg'|'activity'|'goal'):string|null{const p=this.profileForm;switch(field){case'name':return p.name.trim()?'': 'Please enter your name.';case'age':return p.age===null||!Number.isFinite(p.age)?'Please enter your age.':p.age<18||p.age>100?'Age must be between 18 and 100.':'';case'sex':return p.sex?'':'Please choose an option.';case'heightCm':return p.heightCm===null||!Number.isFinite(p.heightCm)?'Please enter your height.':p.heightCm<120||p.heightCm>230?'Height must be between 120 and 230 cm.':'';case'weightKg':return p.weightKg===null||!Number.isFinite(p.weightKg)?'Please enter your weight.':p.weightKg<30||p.weightKg>350?'Weight must be between 30 and 350 kg.':'';case'activity':return p.activity?'':'Please choose your usual activity.';case'goal':return p.goal?'':'Please choose a goal.'}}
   toggleProfileDropdown(field:'sex'|'activity'|'goal'){this.profileDropdown.set(this.profileDropdown()===field?null:field)}
