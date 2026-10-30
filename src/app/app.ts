@@ -69,6 +69,15 @@ const BUILT_INS: LegacyCatalogFood[] = [
   {id:'zucchini',name:'Zucchini',category:'Produce',kcal:17,protein:null,carbs:null,fat:null,portionGrams:1,portionLabel:'g'},
   {id:'lemon',name:'Lemon',category:'Produce',kcal:29,protein:null,carbs:null,fat:null,portionGrams:1,portionLabel:'g'}
 ];
+const BUILT_IN_ARABIC_NAMES:Record<string,string>={
+  'toast':'توست بني','white-toast':'توست أبيض','baladi-bread':'عيش بلدي','pita-bread':'خبز بيتا',
+  'cheddar-slices':'شرائح جبنة شيدر','cheddar':'جبنة شيدر قابلة للدهن','cottage':'جبنة قريش','low-salt-white-cheese':'جبنة بيضاء قليلة الملح','triangle-cheese':'مثلثات جبنة مطبوخة',
+  'turkey':'شرائح تركي مدخن','salami':'سلامي بقري','beef-luncheon':'لانشون بقري','basturma':'بسطرمة',
+  'cooked-rice':'أرز أبيض مطبوخ','raw-rice':'أرز أبيض نيّ','cooked-pasta':'مكرونة مطبوخة','raw-pasta':'مكرونة نيّة','boiled-potato':'بطاطس مسلوقة','mashed-potato':'بطاطس مهروسة سادة','raw-lentils':'عدس نيّ',
+  'raw-chicken':'صدور فراخ نيّة بدون جلد','chicken':'صدور فراخ مطبوخة بدون زيت','tuna-water':'تونة مصفاة بالماء','tuna-oil':'تونة مصفاة بالزيت','lean-beef':'لحم بقري قليل الدهن نيّ','ground-beef':'لحم بقري مفروم 80/20 نيّ','beef-burger':'برجر لحم بقري منزلي سادة',
+  'nutella':'كريمة شوكولاتة بالبندق','honey':'عسل','sugar':'سكر أبيض','oil':'زيت زيتون','vegetable-oil':'زيت نباتي','ghee':'سمن','butter':'زبدة','mayonnaise':'مايونيز','ketchup':'كاتشب',
+  'grapes':'عنب','plum':'برقوق','apple':'تفاح','mango':'مانجو','strawberry':'فراولة','dates':'تمر','tomato':'طماطم','cucumber':'خيار','onion':'بصل','zucchini':'كوسة','lemon':'ليمون'
+};
 const EXTRA_IDS=new Set(FOOD_EXTRAS.map(food=>food.id));
 const USER_SUPPLIED_IDS=new Set(['raw-chicken','cooked-rice','cheddar-slices','turkey','ground-beef']);
 const STORAGE_KEY='nourish-personal-v2';
@@ -80,7 +89,7 @@ export class App {
   profile=signal<Profile|null>(null); customFoods=signal<Food[]>([]); diary=signal<Record<string,Item[]>>({}); waterByDate=signal<Record<string,number>>({}); workoutsByDate=signal<Record<string,Workout[]>>({}); plannerMeals=signal(3); foodKind:'single'|'recipe'='single'; recipeIngredients:RecipeIngredient[]=[{foodId:'',grams:100}]; recipeCookedWeight=100; waterInput=250; exerciseName=''; exerciseSets:WorkoutSet[]=[{reps:10,weightKg:0}];
   profileForm:ProfileDraft={name:'',age:null,sex:'',heightCm:null,weightKg:null,activity:'',goal:'',preferences:''};
   newFood:Partial<Food>={category:'Other',caloriesPer100g:0,name:''};
-  foods=computed(()=>[...this.customFoods().map(f=>({...f,portionGrams:f.portionGrams||100,portionLabel:f.portionLabel||'100 g'})),...BUILT_INS.filter(f=>!EXTRA_IDS.has(f.id)),...FOOD_EXTRAS].map(f=>({...f,caloriesPer100g:f.caloriesPer100g??f.kcal??0,nameEn:f.nameEn??f.name,nameAr:f.nameAr??({ 'raw-chicken':'صدور فراخ نيّة','cooked-rice':'رز أبيض مطبوخ','cheddar-slices':'شيدر شرائح','turkey':'تركي مدخن','ground-beef':'لحم بقري مفروم 80/20 نيّ' } as Record<string,string>)[f.id]??'',sourceType:f.sourceType??(USER_SUPPLIED_IDS.has(f.id)?'user-supplied-estimate':'reference-estimate'),sourceUrl:f.sourceUrl===undefined&&(f.sourceType??(USER_SUPPLIED_IDS.has(f.id)?'user-supplied-estimate':'reference-estimate'))==='reference-estimate'?'https://fdc.nal.usda.gov/food-search/?query='+encodeURIComponent(f.nameEn??f.name):f.sourceUrl??null,isVerified:f.isVerified??false})));
+  foods=computed(()=>[...this.customFoods().map(f=>({...f,portionGrams:f.portionGrams||100,portionLabel:f.portionLabel||'100 g'})),...BUILT_INS.filter(f=>!EXTRA_IDS.has(f.id)),...FOOD_EXTRAS].map(f=>({...f,caloriesPer100g:f.caloriesPer100g??f.kcal??0,nameEn:f.nameEn??f.name,nameAr:f.nameAr??BUILT_IN_ARABIC_NAMES[f.id]??'',sourceType:f.sourceType??(USER_SUPPLIED_IDS.has(f.id)?'user-supplied-estimate':'reference-estimate'),sourceUrl:f.sourceUrl===undefined&&(f.sourceType??(USER_SUPPLIED_IDS.has(f.id)?'user-supplied-estimate':'reference-estimate'))==='reference-estimate'?'https://fdc.nal.usda.gov/food-search/?query='+encodeURIComponent(f.nameEn??f.name):f.sourceUrl??null,isVerified:f.isVerified??false})));
   foodCategories=computed(()=>['All',...Array.from(new Set(this.foods().map(food=>food.category))).sort()]);
   currentItems=computed(()=>this.diary()[this.selectedDate()]||[]);
   currentWater=computed(()=>this.waterByDate()[this.selectedDate()]||0);
