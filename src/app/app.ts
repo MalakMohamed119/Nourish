@@ -85,7 +85,7 @@ const STORAGE_KEY='nourish-personal-v2';
 @Component({selector:'app-root',standalone:true,imports:[CommonModule,FormsModule],templateUrl:'./app.html',styleUrl:'./app.css'})
 export class App {
   readonly Math=Math;
-  tab=signal<Tab>('dashboard'); query=signal(''); category=signal('All'); selectedDate=signal(this.todayKey()); activeMeal=signal<Meal>('Breakfast'); showFoodForm=signal(false); editProfile=signal(false); profileSubmitted=signal(false); profileDropdown=signal<string|null>(null);
+  tab=signal<Tab>('dashboard'); query=signal(''); category=signal('All'); selectedDate=signal(this.todayKey()); activeMeal=signal<Meal>('Breakfast'); showFoodForm=signal(false); editProfile=signal(false); profileSubmitted=signal(false); profileDropdown=signal<string|null>(null); foodDropdown=signal<string|null>(null);
   profile=signal<Profile|null>(null); customFoods=signal<Food[]>([]); diary=signal<Record<string,Item[]>>({}); waterByDate=signal<Record<string,number>>({}); workoutsByDate=signal<Record<string,Workout[]>>({}); plannerMeals=signal(3); foodKind:'single'|'recipe'='single'; recipeIngredients:RecipeIngredient[]=[{foodId:'',grams:100}]; recipeCookedWeight=100; waterInput=250; exerciseName=''; exerciseSets:WorkoutSet[]=[{reps:10,weightKg:0}];
   profileForm:ProfileDraft={name:'',age:null,sex:'',heightCm:null,weightKg:null,activity:'',goal:'',preferences:''};
   newFood:Partial<Food>={category:'Other',caloriesPer100g:0,name:''};
@@ -140,6 +140,10 @@ export class App {
   profileError(field:'name'|'age'|'sex'|'heightCm'|'weightKg'|'activity'|'goal'):string|null{const p=this.profileForm;switch(field){case'name':return p.name.trim()?'': 'Please enter your name.';case'age':return p.age===null||!Number.isFinite(p.age)?'Please enter your age.':p.age<18||p.age>100?'Age must be between 18 and 100.':'';case'sex':return p.sex?'':'Please choose an option.';case'heightCm':return p.heightCm===null||!Number.isFinite(p.heightCm)?'Please enter your height.':p.heightCm<120||p.heightCm>230?'Height must be between 120 and 230 cm.':'';case'weightKg':return p.weightKg===null||!Number.isFinite(p.weightKg)?'Please enter your weight.':p.weightKg<30||p.weightKg>350?'Weight must be between 30 and 350 kg.':'';case'activity':return p.activity?'':'Please choose your usual activity.';case'goal':return p.goal?'':'Please choose a goal.'}}
   toggleProfileDropdown(field:'sex'|'activity'|'goal'){this.profileDropdown.set(this.profileDropdown()===field?null:field)}
   chooseProfileOption(field:'sex'|'activity'|'goal',value:string){if(field==='sex')this.profileForm.sex=value as Profile['sex'];if(field==='activity')this.profileForm.activity=value as Activity;if(field==='goal')this.profileForm.goal=value as Goal;this.profileDropdown.set(null)}
+  toggleFoodDropdown(field:string){this.foodDropdown.set(this.foodDropdown()===field?null:field)}
+  chooseFoodKind(value:'single'|'recipe'){this.foodKind=value;this.foodDropdown.set(null)}
+  chooseFoodCategory(value:string){this.newFood.category=value as Category;this.foodDropdown.set(null)}
+  chooseRecipeIngredient(item:RecipeIngredient,value:string){item.foodId=value;this.foodDropdown.set(null)}
   isProfileValid(){return(['name','age','sex','heightCm','weightKg','activity','goal'] as const).every(field=>!this.profileError(field))}
   setProfile(){this.profileSubmitted.set(true);const p=this.profileForm;if(!this.isProfileValid())return;this.profile.set({...p,age:p.age!,heightCm:p.heightCm!,weightKg:p.weightKg!,sex:p.sex as Profile['sex'],activity:p.activity as Activity,goal:p.goal as Goal,name:p.name.trim()});this.editProfile.set(false);this.profileSubmitted.set(false);this.save()}
   openProfile(){const p=this.profile();if(p)this.profileForm={...p};this.profileSubmitted.set(false);this.editProfile.set(true)}
